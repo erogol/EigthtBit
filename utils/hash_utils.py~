@@ -49,8 +49,4 @@ def dhash(img, hash_size = 8):
     img_g = cv2.resize(img, (hash_size+1, hash_size))
     
     diff = img_g[1:,:] > img_g[:-1,:]
-    str_rep = [ str(int(val)) for val in list(diff.flatten())]
-    str_rep = ''.join(str_rep)
-    print str_rep
-    img_signature = '%016X' % long(str_rep, 2)
-    return img_signature, diff.astype('uint8')
+    return diff.astype('uint8')
