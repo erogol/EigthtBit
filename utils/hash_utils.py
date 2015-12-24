@@ -52,5 +52,5 @@ def dhash(img, hash_size = 8):
     str_rep = [ str(int(val)) for val in list(diff.flatten())]
     str_rep = ''.join(str_rep)
     print str_rep
-    img_signature = '%016X' % long(str_rep, 2)
-    return img_signature, diff.astype('uint8')
+    # img_signature = '%016X' % long(str_rep, 2)
+    return str_rep, diff.astype('uint8')

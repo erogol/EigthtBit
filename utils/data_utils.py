@@ -209,7 +209,7 @@ def name_img(img):
     Create a unique name for the given image as its hexadecimal
     match of the dhash value
   """
-  str_list = ''.join(str(e) for e in list(dhash(img).flatten()))
+  str_list = ''.join(str(e) for e in list(dhash(img)[0]))
   return str(hex(int(str_list,2)))
 
 def rename_imgs(img_paths, hash_func = 'dhash'):
