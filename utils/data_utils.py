@@ -70,13 +70,19 @@ def load_data(root_path, ext):
     """
 
     file_paths, classes, class_names = get_data_paths(root_path, ext)
-    feat_vec = np.loadtxt(file_paths[0], delimiter='\n')
+    if 'npy' in ext:
+      feat_vec = np.load(file_paths[0])
+    else:
+      feat_vec = np.loadtxt(file_paths[0], delimiter='\n')
 
     X = np.zeros([len(file_paths), feat_vec.shape[0]])
     #counter  = 0;
     # pb = ProgressBar(maxval= len(file_paths))
     for count, file_path in enumerate(file_paths):
-        feat_vec = np.loadtxt(file_path, delimiter='\n').astype('float32')
+        if 'npy' in ext:
+          feat_vec = np.load(file_path)
+        else:
+          feat_vec = np.loadtxt(file_path, delimiter='\n')
         # print file_path
         X[count,:] = feat_vec
         # pb.update(count)
