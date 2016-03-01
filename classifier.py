@@ -1,16 +1,15 @@
 import os
+import sys
 import numpy as np
 import pandas as pd
 import cPickle
 import time
 
-import mxnet as mx
-import caffe
-
 import logging
 from skimage import io, transform
 from matplotlib import pylab as plt
 from config import Config
+from utils import img_utils
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -23,31 +22,34 @@ class ImageNet1KInceptionMXNet(object):
     Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
     challenge. It is able to extract features and classify the given image
     """
-    def __init__(self, gpu_mode, crop_center=False, is_retrieval=False):
+    def __init__(self, gpu_mode, crop_center=False, is_retrieval=False, batch_size=1):
         """
         Parameters
         ----------
         gpu_mode : bool
             If True model runs on GPU
         crop_center : bool, optional
-            if True, model crops the image center by resizing the image regarding 
+            if True, model crops the image center by resizing the image regarding
             shortest side.
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        import mxnet as mx
+
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/Inception/'
-        
+
         # Load the pre-trained model
         prefix = ROOT_PATH+"Inception_BN"
         num_round = 39
         if gpu_mode:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
-        
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=batch_size)
+
         # Load mean file
         self.mean_img = mx.nd.load(ROOT_PATH+"mean_224.nd")["mean_img"]
-        
+
         # Load synset (text label)
         self.synset = [l.strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
 
@@ -67,8 +69,8 @@ class ImageNet1KInceptionMXNet(object):
                 self.feature_extractor = mx.model.FeedForward(ctx=mx.cpu(), symbol=fea_symbol, numpy_batch_size=1,
                                          arg_params=self.model.arg_params, aux_params=self.model.aux_params,
                                          allow_extra_params=True)
-        
-        
+
+
     def preprocess_image(self, img, show_img=False):
         # load image
         if type(img) == str:
@@ -91,11 +93,11 @@ class ImageNet1KInceptionMXNet(object):
         # swap axes to make image from (224, 224, 4) to (3, 224, 224)
         sample = np.swapaxes(sample, 0, 2)
         sample = np.swapaxes(sample, 1, 2)
-        # sub mean 
+        # sub mean
         normed_img = sample - self.mean_img.asnumpy()
         normed_img.resize(1, 3, 224, 224)
         return normed_img
-    
+
     def classify_image(self, img):
         start = time.time()
         img = self.preprocess_image(img)
@@ -121,28 +123,31 @@ class ImageNet1KInceptionV3MXNet(object):
     Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
     challenge. It is able to extract features and classify the given image
     """
-    def __init__(self, gpu_mode, crop_center=False, is_retrieval=False):
+    def __init__(self, gpu_mode, crop_center=False, is_retrieval=False, batch_size=1):
         """
         Parameters
         ----------
         gpu_mode : bool
             If True model runs on GPU
         crop_center : bool, optional
-            if True, model crops the image center by resizing the image regarding 
+            if True, model crops the image center by resizing the image regarding
             shortest side.
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        import mxnet as mx
+
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-1k-Inceptionv3/'
-        
+
         # Load the pre-trained model
         prefix = ROOT_PATH+"Inception-7"
         num_round = 1
         if gpu_mode:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
-        
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=batch_size)
+
         # Load synset (text label)
         self.synset = [l.strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
 
@@ -162,12 +167,13 @@ class ImageNet1KInceptionV3MXNet(object):
                 self.feature_extractor = mx.model.FeedForward(ctx=mx.cpu(), symbol=fea_symbol, numpy_batch_size=1,
                                          arg_params=self.model.arg_params, aux_params=self.model.aux_params,
                                          allow_extra_params=True)
-        
-        
-    def preprocess_image(self,path):
+
+
+    def preprocess_image(self,img):
         "first resize image to 384 x 384"
         # load image
-        img = io.imread(path)
+        if type(img) == str:
+            img = io.imread(img)
         #print("Original Image Shape: ", img.shape)
         # we crop image from center
         short_egde = min(img.shape[:2])
@@ -186,10 +192,11 @@ class ImageNet1KInceptionV3MXNet(object):
         normed_img /= 128.
 
         return np.reshape(normed_img, (1, 3, 299, 299))
-    
-    def classify_image(self, img):
+
+    def classify_image(self, img, preprocess = True):
         start = time.time()
-        img = self.preprocess_image(img)
+        if preprocess:
+            img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
         prob = self.model.predict(img)[0]
         end   = time.time()
@@ -206,36 +213,39 @@ class ImageNet1KInceptionV3MXNet(object):
         query_img = self.preprocess_image(img)
         query_feat = self.feature_extractor.predict(query_img)
         return query_feat
-    
+
 class ImageNet21KInceptionMXNet(object):
-    def __init__(self, gpu_mode, crop_center=False):
+    def __init__(self, gpu_mode, crop_center=False, batch_size=1):
         """
         Parameters
         ----------
         gpu_mode : bool
             If True model runs on GPU
         crop_center : bool, optional
-            if True, model crops the image center by resizing the image regarding 
+            if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-21k-inception/Inception-Full/'
-        
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        import mxnet as mx
+
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-21k-inception/'
+
         # Load the pre-trained model
         prefix = ROOT_PATH+"Inception"
         num_round = 9
         if gpu_mode:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
-        
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=batch_size)
+
         self.mean_img = self.mean_img = np.ones([3,224,224])*117.0
 
-        self.crop_img = crop_img
-        
+        self.crop_img = crop_center
+
         # Load synset (text label)
         self.synset = [l.strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
-        
-        
+
+
     def preprocess_image(self, img, show_img=False):
         # load image
         if type(img) == str:
@@ -257,15 +267,15 @@ class ImageNet21KInceptionMXNet(object):
         # swap axes to make image from (224, 224, 4) to (3, 224, 224)
         sample = np.swapaxes(sample, 0, 2)
         sample = np.swapaxes(sample, 1, 2)
-        # sub mean 
+        # sub mean
         normed_img = sample - self.mean_img
         normed_img.resize(1, 3, 224, 224)
-        print img.mean()
         return normed_img
-    
-    def classify_image(self, img):
+
+    def classify_image(self, img, preprocess=True):
         start = time.time()
-        img = self.preprocess_image(img)
+        if preprocess:
+            img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
         prob = self.model.predict(img)[0]
         end   = time.time()
@@ -276,47 +286,53 @@ class ImageNet21KInceptionMXNet(object):
         top5 = [top_str[top_str.find(' ')::].split(',')[0] for top_str in top5]
         top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
         top5 = zip(top5, top5_probs)
-        print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return (True, top5, '%.3f' % (end - start))
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return (True, top5, '%.3f' % (end - start)), pred[0:5]
+
 
 
 class Clothes21MXNet(object):
     """
-    Interface for clothes model backed by MxNet trained by Pinterest images. 
+    Interface for clothes model backed by MxNet trained by Pinterest images.
     It supports 21 clothing types
     """
-    def __init__(self, gpu_mode):
+    def __init__(self, gpu_mode, crop_center=False, batch_size = 1):
         """
         Parameters
         ----------
         gpu_mode : bool
             If True model runs on GPU
         crop_center : bool, optional
-            if True, model crops the image center by resizing the image regarding 
+            if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/AlexNet/'
-        
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+        import mxnet as mx
+
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/DressrankAlexNet/'
+
         # Load the pre-trained model
         prefix = ROOT_PATH+"inception_AlexNet"
-        num_round = 24
+        num_round = 25
         if gpu_mode:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
-        
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=batch_size)
+
         # Load mean file
         self.mean_img = np.ones([3,224,224])*127.0
-        
+
+        self.crop_img = crop_center
+
         # Load synset (text label)
-        self.categories = [l.split()[1] for l in open(ROOT_PATH+'categories.txt').readlines()]
-        
-        
+        self.synset = [l.split()[1] for l in open(ROOT_PATH+'categories.txt').readlines()]
+
+
     def preprocess_image(self, img, show_img=False):
         # load image
         if type(img) == str:
             img = io.imread(img)
-        # we crop image from center
+
         if self.crop_img:
             short_egde = min(img.shape[:2])
             yy = int((img.shape[0] - short_egde) / 2)
@@ -333,12 +349,12 @@ class Clothes21MXNet(object):
         # swap axes to make image from (224, 224, 4) to (3, 224, 224)
         sample = np.swapaxes(sample, 0, 2)
         sample = np.swapaxes(sample, 1, 2)
-        # sub mean 
+        # sub mean
         normed_img = sample - self.mean_img
         normed_img.resize(1, 3, 224, 224)
-        print img.mean()
+        # print img.mean()
         return normed_img
-    
+
     def classify_image(self, img):
         start = time.time()
         img = self.preprocess_image(img)
@@ -348,12 +364,13 @@ class Clothes21MXNet(object):
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
         # Get top5 label
-        top5 = [self.categories[pred[i]] for i in range(5)]
+        top5 = [self.synset[pred[i]] for i in range(5)]
         top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
         top5 = zip(top5, top5_probs)
         print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return (True, top5, '%.3f' % (end - start))
-    
+        return (True, top5, '%.3f' % (end - start)), pred[0:5]
+
+
 class Places2Caffe(object):
     """
     Interface for the Places2 model backed by Caffe. It supports 408 scene classes.
@@ -365,18 +382,21 @@ class Places2Caffe(object):
         gpu_mode : bool
             If True model runs on GPU
         """
+        sys.path.insert(0,'/media/erogol8bit/data_hdd/Libs/caffe_bundle/caffe/python')
+        import caffe
+
         MODEL_DEPLOY  = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/deploy.prototxt'
         MODEL_BINARY  = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/inception_bn_aug_iter_60000.caffemodel'
         CATEGORY_FILE = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/categories.txt'
-        
+
         logging.info('Loading net and associated files...')
         if gpu_mode:
-            logging.info('Model in GPU mode !!') 
+            logging.info('Model in GPU mode !!')
             caffe.set_mode_gpu()
         else:
-            logging.info('Model in CPU mode !!') 
+            logging.info('Model in CPU mode !!')
             caffe.set_mode_cpu()
-        
+
         self.net = caffe.Net(MODEL_DEPLOY,
                         MODEL_BINARY,
                         caffe.TEST)
@@ -387,7 +407,7 @@ class Places2Caffe(object):
         self.transformer.set_mean('data', np.array([127.0,127.0,127.0])) # mean pixel
         self.transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
         self.transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
-        
+
         # set net to batch size of 1
         self.net.blobs['data'].reshape(1,3,224,224)
 
@@ -416,4 +436,235 @@ class Places2Caffe(object):
             print bet_result
             return (True, bet_result, '%.3f' % (endtime - starttime))
 
-        
+
+class ColorsAlexnetMXNet(object):
+    def __init__(self, gpu_mode):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+        import mxnet as mx
+
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/WanteringColorAlexnet/'
+
+        # Load the pre-trained model
+        prefix = ROOT_PATH+"alexnet"
+        num_round = 21
+        if gpu_mode:
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+        else:
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
+
+        # Load mean file
+        self.mean_img = np.ones([3,224,224])*127.0
+
+        # Load synset (text label)
+        self.categories = [l for l in open(ROOT_PATH+'synset.txt').readlines()]
+
+
+    def preprocess_image(self, img, show_img=False):
+        # load image
+        #img = io.imread('http://cdn.phys.org/newman/gfx/news/hires/2012/1-bmw.jpg')
+        #print("Original Image Shape: ", img.shape)
+        # we crop image from center
+        short_egde = min(img.shape[:2])
+        yy = int((img.shape[0] - short_egde) / 2)
+        xx = int((img.shape[1] - short_egde) / 2)
+        crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        # resize to 224, 224
+        resized_img = transform.resize(crop_img, (224, 224))
+        if show_img:
+            io.imshow(resized_img)
+        # convert to numpy.ndarray
+        sample = np.asarray(resized_img) * 256
+        # swap axes to make image from (224, 224, 4) to (3, 224, 224)
+        sample = np.swapaxes(sample, 0, 2)
+        sample = np.swapaxes(sample, 1, 2)
+        # sub mean
+        normed_img = sample - self.mean_img
+        normed_img.resize(1, 3, 224, 224)
+        print img.mean()
+        return normed_img
+
+    def classify_image(self, img):
+        start = time.time()
+        img = self.preprocess_image(img)
+        # Get prediction probability of 1000 classes from model
+        prob = self.model.predict(img)[0]
+        end   = time.time()
+        # Argsort, get prediction index from largest prob to lowest
+        pred = np.argsort(prob)[::-1]
+        # Get top5 label
+        top5 = [self.categories[pred[i]] for i in range(5)]
+        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
+        top5 = zip(top5, top5_probs)
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return (True, top5, '%.3f' % (end - start))
+
+class LocSegNetwork(object):
+    '''
+        This network borrowed from https://github.com/xiaolonw/nips14_loc_seg_testonly
+        It first localizes the content then tries to segment it pixel-wise.
+        Results are not perfect but still useful.
+    '''
+    def __init__(self, gpu_mode=1, is_loc=1, is_seg=1):
+        sys.path.insert(0,'/media/erogol8bit/data_hdd/Libs/caffe_bundle/caffe/python')
+        import caffe
+
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH + "Models/Caffe/LocSegModel/"
+        # Load mean image
+        mean_img = np.load('/media/erogol8bit/data_hdd/Libs/nips14_loc_seg_testonly/Caffe_Segmentation/segscripts/models/mean.npy')
+        mean_img = mean_img[:, 14:241,14:241 ]
+        self.mean_img = mean_img
+
+        if gpu_mode:
+            caffe.set_mode_gpu()
+        else:
+            caffe.set_mode_cpu()
+
+        if is_loc:
+            # Localization model
+            self.loc_net = caffe.Net(ROOT_PATH+'loc/imagenet_test_mem.prototxt',
+                        ROOT_PATH+'loc.caffemodel',
+                        caffe.TEST)
+
+            # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
+            self.loc_transformer = caffe.io.Transformer({'data': self.loc_net.blobs['data'].data.shape})
+            self.loc_transformer.set_transpose('data', (2,0,1))
+            self.loc_transformer.set_mean('data', self.mean_img) # mean pixel
+            self.loc_transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
+            self.loc_transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
+            self.loc_net.blobs['data'].reshape(1,3,227,227)
+
+        if is_seg:
+            # Segmentation model
+            self.seg_net = caffe.Net(ROOT_PATH+'seg/seg_test_mem.prototxt',
+                            ROOT_PATH+'seg.caffemodel',
+                            caffe.TEST)
+
+            # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
+            self.seg_transformer = caffe.io.Transformer({'data': self.seg_net.blobs['data'].data.shape})
+            self.seg_transformer.set_transpose('data', (2,0,1))
+            self.seg_transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
+            self.seg_transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
+            self.seg_net.blobs['data'].reshape(1,3,55,55)
+
+    def localize(self,img, show_result=0):
+        """
+            returns bounding box for the object of interest
+            with regard to 256x256 image size. If the target image
+            has other size values, bbox coordinates should be checked
+            regardingly.
+
+            Inputs:
+                img - target color image given in any size
+                show_result - show the result bbox on the image for debug
+
+            Outputs:
+                bbox - bbox coordinates (x1,y1,x2,y2)
+                loc_img - localized region
+                img_256 - reference image for bbox coordinates
+        """
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+        # preprocess img
+        img_256 = transform.resize(img,[256,256,3])
+        img = img_256[14:241,14:241, :]
+        img = self.loc_transformer.preprocess('data', img)
+        # give image to network
+        self.loc_net.blobs['data'].data[...] = img
+        # feedforward img
+        out = self.loc_net.forward()
+        # Set bbox predictions by the border limits
+        bbox = out['fc8_loc'][0].astype(int)
+        bbox[bbox<0] = 0
+        bbox[bbox>=256] = 255
+        # show results
+        if show_result:
+            print bbox
+            plt.figure()
+            plt.plot(np.array([bbox[0],bbox[0], bbox[2], bbox[2], bbox[0]]), np.array([bbox[1], bbox[3], bbox[3], bbox[1], bbox[1]]))
+            plt.imshow(img_256)
+            plt.show()
+        # create final localized region
+        loc_img = img_256[bbox[1]:bbox[3], bbox[0]:bbox[2], ]
+        return bbox, loc_img, img_256
+
+
+    def segment(self, img, show_result=1, bbox=None):
+        """
+            Segments the region of interest. Given image is resized to 55x55 and
+            the resulting segmentation mask has size 50x50. So the segmentation
+            mask should be resized for any third party use.
+
+            Inputs:
+                img - target color image given in any size
+                show_result - show the result bbox on the image for debug
+                bbox - bounding box coordinates to consider
+
+            Outputs:
+                seg_resized - segmenation mask in image size
+                img_seg - segmented image
+        """
+        if type(img) is str or type(img) is unicode:
+            img_org = io.imread(img)
+        else:
+            img_org = img
+        if bbox is not None:
+            img_crop = img_org[bbox[1]:bbox[3], bbox[0]:bbox[2], ]
+        else:
+            img_crop = img_org
+        img_crop = transform.resize(img_crop, [55,55])
+        # set the image mean and resize it to 55x55
+        if bbox is not None:
+            mean_crop = self.mean_img[:, bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        else:
+            mean_crop = self.mean_img
+        mean_crop = transform.resize(mean_crop, [3,55,55])
+        self.seg_transformer.set_mean('data', mean_crop) # mean pixel
+        # Feedforward network
+        self.seg_net.blobs['data'].data[...] = self.seg_transformer.preprocess('data', img_crop)
+        out = self.seg_net.forward()
+        # Fetch result
+        seg = out['fc8_seg']
+        seg = np.fliplr(seg.reshape([50,50]))
+        # create segmented img
+        seg_resized = np.zeros(img_org.shape[:2])
+        if bbox is not None:
+            seg_resized[bbox[1]:bbox[3], bbox[0]:bbox[2]] += transform.resize(seg,[bbox[3]-bbox[1], bbox[2]-bbox[0]])
+        else:
+            seg_resized += transform.resize(seg,img_org.shape[:2])
+        # seg_resized[seg_resized > 0] = 1
+        img_seg = img_org.copy()
+        img_seg[:,:,0] *= seg_resized
+        img_seg[:,:,1] *= seg_resized
+        img_seg[:,:,2] *= seg_resized
+        # show result
+        if show_result:
+            plt.figure()
+            plt.imshow(img_seg)
+            plt.show()
+        return seg_resized, img_seg
+
+    def localize_and_segment(self, img, crop=0, show_result=1):
+        """
+            Apply localization and segmentation networks in oreder.
+
+            Inputs:
+                img - target color image given in any size
+                crop - crop segmentated region
+                show_result - show the result bbox on the image for debug
+
+            Outputs:
+                seg_mask - segmenation mask in image size
+                img_seg - segmented image
+        """
+        bbox, loc_img, img_256 = self.localize(img, show_result)
+        seg_mask, img_seg = self.segment(img_256, show_result, bbox)
+        if crop:
+            # crop segment out regions from image
+            seg_mask[seg_mask<seg_mask.mean()] = 0
+            y_idxs,x_idxs = seg_mask.nonzero()
+            left = x_idxs.min()
+            right = x_idxs.max()
+            top = y_idxs.min()
+            bot = y_idxs.max()
+            img_seg = img_seg[top:bot, left:right, :]
+        return seg_mask, img_seg
