@@ -32,13 +32,13 @@ def get_data_paths(root_path, ext = '*.jpg'):
       For correct outputs, each class of images should be in a separate folder in the
       given root_path. Each unique folder names defines the label of its images.
 
-      root_path : root_path to start searching 
+      root_path : root_path to start searching
       ext       : wildcard to define desired files. exp. *.jpg is all jpg files
 
       OUTPUTS---
 
       matches   : image paths of found items
-      classes   : numeric class labels for the images. 
+      classes   : numeric class labels for the images.
       class_names   : class names as the including folder name
     """
 
@@ -70,12 +70,14 @@ def load_data(root_path, ext):
     """
 
     file_paths, classes, class_names = get_data_paths(root_path, ext)
+    print file_paths[0]
     if 'npy' in ext:
       feat_vec = np.load(file_paths[0])
     else:
       feat_vec = np.loadtxt(file_paths[0], delimiter='\n')
 
-    X = np.zeros([len(file_paths), feat_vec.shape[0]])
+    X = np.zeros([len(file_paths), feat_vec.shape[1]])
+    print X.shape
     #counter  = 0;
     # pb = ProgressBar(maxval= len(file_paths))
     for count, file_path in enumerate(file_paths):
@@ -90,7 +92,7 @@ def load_data(root_path, ext):
     return X, np.array(classes)[:, None], class_names, file_paths
 
 def load_imgs(img_paths, size=None):
-  
+
   if size is not None:
     if None in size:
       print "Resizing only supports squared sized. (height == width)"
@@ -105,7 +107,7 @@ def load_imgs(img_paths, size=None):
       try:
         img = imgresize(img, size)
       except:
-        print img_path 
+        print img_path
         shutil.move(img_path, '/media/retina18/SAMSUNG/PinterestImgs/RottenImages')
       try:
         assert img.shape[0] == size[0]
@@ -116,7 +118,7 @@ def load_imgs(img_paths, size=None):
         return
     img_list.append(img)
     pb.update(c)
-    c +=1 
+    c +=1
   pb.finish()
   return img_list
 
@@ -142,7 +144,7 @@ def remove_duplicate_images(paths, ext = 'jpg'):
           print path
           os.remove(path)
           continue
-        
+
         hash_val = str(list(dhash(img)))
         if img_dict[hash_val] == 0:
             img_dict[hash_val] += 1
@@ -162,8 +164,8 @@ def convert_img_to_jpg(img_path):
   except IOError:
     print 'Cannot read !! ',img_path
     return
-    
-  try: 
+
+  try:
     bg = Image.new("RGB", img.size, (255,255,255))
     bg.paste(img,img)
     bg.save(img_path.replace(file_ext,'.jpg'))
@@ -225,7 +227,7 @@ def rename_imgs(img_paths, hash_func = 'dhash'):
     img = imgread(img_path)
     new_file_name = str(phash(img)[0])
     new_path = img_path.replace(file_name,new_file_name)
-    # print new_path 
+    # print new_path
     try:
       os.rename(img_path, new_path)
     except:
