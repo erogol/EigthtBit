@@ -76,7 +76,8 @@ def load_data(root_path, ext):
     else:
       feat_vec = np.loadtxt(file_paths[0], delimiter='\n')
 
-    X = np.zeros([len(file_paths), feat_vec.shape[1]])
+    print feat_vec.shape
+    X = np.zeros([len(file_paths), feat_vec.shape[0]])
     print X.shape
     #counter  = 0;
     # pb = ProgressBar(maxval= len(file_paths))

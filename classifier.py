@@ -98,7 +98,7 @@ class ImageNet1KInceptionMXNet(object):
         normed_img.resize(1, 3, 224, 224)
         return normed_img
 
-    def classify_image(self, img):
+    def classify_image(self, img, N=5):
         start = time.time()
         img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
@@ -106,17 +106,67 @@ class ImageNet1KInceptionMXNet(object):
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
-        # Get top5 label
-        top5 = [self.synset[pred[i]] for i in range(5)]
-        top5 = [top_str[top_str.find(' ')::].split(',')[0] for top_str in top5]
-        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
-        top5 = zip(top5, top5_probs)
-        return (True, top5, '%.3f' % (end - start))
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN = zip(topN, topN_probs)
+        return '%.3f' % (end - start), topN, pred[0:N]
 
     def feature_extraction(self, img):
         query_img = self.preprocess_image(img, show_img=False)
         query_feat = self.feature_extractor.predict(query_img)
         return query_feat
+
+    def produce_cam(self, img, class_id=None, top=-1):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        import mxnet as mx
+
+        # Create CAM model outputs Global Average Pooling layer
+        internals = self.model.symbol.get_internals()
+        fea_symbol = internals['ch_concat_5b_chconcat_output']
+        CAM = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                             arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                             allow_extra_params=True)
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+
+        # Give image, preprocess and get GAP activations
+        batch = self.preprocess_image(img)
+        GAP = CAM.predict(batch).squeeze()
+        # Get fc layer weights
+        W = self.model.arg_params['fc_weight'].asnumpy()
+        # Get class specific weights
+        class_W = W[class_id]
+        # Abs of class specific weights
+        class_W_abs = np.abs(class_W)
+        # Create empty GAP
+        class_GAP = np.zeros(GAP.shape)
+        if top > 0 :
+            top_idxs = (-class_W_abs).argsort()[0:top]
+            for count,idx in enumerate(top_idxs):
+                class_GAP[idx] = GAP[idx] * class_W_abs[idx]
+        else:
+            for count,w in enumerate(class_W_abs):
+                class_GAP[count] = GAP[count] * w
+
+        # Create CAM
+        # Find average GAP*W and normalize to 0,1 scale
+        CAM = class_GAP.sum(axis=0)
+        CAM = CAM + -1*CAM.min()
+        CAM = CAM / CAM.max()
+        assert CAM.min() == 0
+        assert CAM.max() == 1
+
+        # Resize to image size
+        CAM_resized = transform.resize(CAM, (img.shape[0], img.shape[1]), )
+
+        # plt.figure()
+        # plt.title(synset[class_id])
+        # plt.imshow(CAM_resized,cmap='cubehelix')
+        # plt.show()
+        return CAM_resized
+
 
 class ImageNet1KInceptionV3MXNet(object):
     """
@@ -174,12 +224,13 @@ class ImageNet1KInceptionV3MXNet(object):
         # load image
         if type(img) == str:
             img = io.imread(img)
-        #print("Original Image Shape: ", img.shape)
-        # we crop image from center
-        short_egde = min(img.shape[:2])
-        yy = int((img.shape[0] - short_egde) / 2)
-        xx = int((img.shape[1] - short_egde) / 2)
-        crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        if self.crop_center:
+            short_egde = min(img.shape[:2])
+            yy = int((img.shape[0] - short_egde) / 2)
+            xx = int((img.shape[1] - short_egde) / 2)
+            crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        else:
+            crop_img = img
         # resize to 299, 299
         resized_img = transform.resize(crop_img, (299, 299))
         # convert to numpy.ndarray
@@ -193,7 +244,7 @@ class ImageNet1KInceptionV3MXNet(object):
 
         return np.reshape(normed_img, (1, 3, 299, 299))
 
-    def classify_image(self, img, preprocess = True):
+    def classify_image(self, img, preprocess=True, N=5):
         start = time.time()
         if preprocess:
             img = self.preprocess_image(img)
@@ -202,17 +253,66 @@ class ImageNet1KInceptionV3MXNet(object):
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
-        # Get top5 label
-        top5 = [self.synset[pred[i]] for i in range(5)]
-        top5 = [top_str[top_str.find(' ')::].split(',')[0] for top_str in top5]
-        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
-        top5 = zip(top5, top5_probs)
-        return (True, top5, '%.3f' % (end - start))
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN = zip(topN, topN_probs)
+        return  '%.3f' % (end - start), topN, pred[0:N]
 
     def feature_extraction(self, img):
         query_img = self.preprocess_image(img)
         query_feat = self.feature_extractor.predict(query_img)
         return query_feat
+
+    def produce_cam(self, img, class_id=None, top=-1):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        import mxnet as mx
+
+        # Create CAM model outputs Global Average Pooling layer
+        internals = self.model.symbol.get_internals()
+        fea_symbol = internals['ch_concat_mixed_10_chconcat_output']
+        CAM = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                             arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                             allow_extra_params=True)
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+
+        # Give image, preprocess and get GAP activations
+        batch = self.preprocess_image(img)
+        GAP = CAM.predict(batch).squeeze()
+        # Get fc layer weights
+        W = self.model.arg_params['fc1_weight'].asnumpy()
+        # Get class specific weights
+        class_W = W[class_id]
+        # Abs of class specific weights
+        class_W_abs = np.abs(class_W)
+        # Create empty GAP
+        class_GAP = np.zeros(GAP.shape)
+        if top > 0 :
+            top_idxs = (-class_W_abs).argsort()[0:top]
+            for count,idx in enumerate(top_idxs):
+                class_GAP[idx] = GAP[idx] * class_W_abs[idx]
+        else:
+            for count,w in enumerate(class_W_abs):
+                class_GAP[count] = GAP[count] * w
+
+        # Create CAM
+        # Find average GAP*W and normalize to 0,1 scale
+        CAM = class_GAP.sum(axis=0)
+        CAM = CAM + -1*CAM.min()
+        CAM = CAM / CAM.max()
+        assert CAM.min() == 0
+        assert CAM.max() == 1
+
+        # Resize to image size
+        CAM_resized = transform.resize(CAM, (img.shape[0], img.shape[1]), )
+
+        # plt.figure()
+        # plt.title(synset[class_id])
+        # plt.imshow(CAM_resized,cmap='cubehelix')
+        # plt.show()
+        return CAM_resized
 
 class ImageNet21KInceptionMXNet(object):
     def __init__(self, gpu_mode, crop_center=False, batch_size=1):
@@ -240,7 +340,7 @@ class ImageNet21KInceptionMXNet(object):
 
         self.mean_img = self.mean_img = np.ones([3,224,224])*117.0
 
-        self.crop_img = crop_center
+        self.crop_center = crop_center
 
         # Load synset (text label)
         self.synset = [l.strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
@@ -251,7 +351,7 @@ class ImageNet21KInceptionMXNet(object):
         if type(img) == str:
             img = io.imread(img)
         # we crop image from center
-        if self.crop_img:
+        if self.crop_center:
             short_egde = min(img.shape[:2])
             yy = int((img.shape[0] - short_egde) / 2)
             xx = int((img.shape[1] - short_egde) / 2)
@@ -272,7 +372,7 @@ class ImageNet21KInceptionMXNet(object):
         normed_img.resize(1, 3, 224, 224)
         return normed_img
 
-    def classify_image(self, img, preprocess=True):
+    def classify_image(self, img, preprocess=True, N=5):
         start = time.time()
         if preprocess:
             img = self.preprocess_image(img)
@@ -281,17 +381,66 @@ class ImageNet21KInceptionMXNet(object):
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
-        # Get top5 label
-        top5 = [self.synset[pred[i]] for i in range(5)]
-        top5 = [top_str[top_str.find(' ')::].split(',')[0] for top_str in top5]
-        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
-        top5 = zip(top5, top5_probs)
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN = zip(topN, topN_probs)
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return (True, top5, '%.3f' % (end - start)), pred[0:5]
+        return '%.3f' % (end - start), topN, pred[0:N]
+
+    def produce_cam(self, img, class_id=None, top=-1):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        import mxnet as mx
+
+        # Create CAM model outputs Global Average Pooling layer
+        internals = self.model.symbol.get_internals()
+        fea_symbol = internals['ch_concat_5b_chconcat_output']
+        CAM = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                             arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                             allow_extra_params=True)
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+
+        # Give image, preprocess and get GAP activations
+        batch = self.preprocess_image(img)
+        GAP = CAM.predict(batch).squeeze()
+        # Get fc layer weights
+        W = self.model.arg_params['fc1_weight'].asnumpy()
+        # Get class specific weights
+        class_W = W[class_id]
+        # Abs of class specific weights
+        class_W_abs = np.abs(class_W)
+        # Create empty GAP
+        class_GAP = np.zeros(GAP.shape)
+        if top > 0 :
+            top_idxs = (-class_W_abs).argsort()[0:top]
+            for count,idx in enumerate(top_idxs):
+                class_GAP[idx] = GAP[idx] * class_W_abs[idx]
+        else:
+            for count,w in enumerate(class_W_abs):
+                class_GAP[count] = GAP[count] * w
+
+        # Create CAM
+        # Find average GAP*W and normalize to 0,1 scale
+        CAM = class_GAP.sum(axis=0)
+        CAM = CAM + -1*CAM.min()
+        CAM = CAM / CAM.max()
+        assert CAM.min() == 0
+        assert CAM.max() == 1
+
+        # Resize to image size
+        CAM_resized = transform.resize(CAM, (img.shape[0], img.shape[1]), )
+
+        # plt.figure()
+        # plt.title(synset[class_id])
+        # plt.imshow(CAM_resized,cmap='cubehelix')
+        # plt.show()
+        return CAM_resized
 
 
 
-class Clothes21MXNet(object):
+class LystInception(object):
     """
     Interface for clothes model backed by MxNet trained by Pinterest images.
     It supports 21 clothing types
@@ -309,11 +458,11 @@ class Clothes21MXNet(object):
         sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
         import mxnet as mx
 
-        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/DressrankAlexNet/'
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/LystInception/'
 
         # Load the pre-trained model
-        prefix = ROOT_PATH+"inception_AlexNet"
-        num_round = 25
+        prefix = ROOT_PATH+"inception"
+        num_round = 52
         if gpu_mode:
             self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
@@ -322,10 +471,10 @@ class Clothes21MXNet(object):
         # Load mean file
         self.mean_img = np.ones([3,224,224])*127.0
 
-        self.crop_img = crop_center
+        self.crop_center = crop_center
 
         # Load synset (text label)
-        self.synset = [l.split()[1] for l in open(ROOT_PATH+'categories.txt').readlines()]
+        self.synset = [l.split()[1] for l in open(ROOT_PATH+'synset.txt').readlines()]
 
 
     def preprocess_image(self, img, show_img=False):
@@ -333,7 +482,7 @@ class Clothes21MXNet(object):
         if type(img) == str:
             img = io.imread(img)
 
-        if self.crop_img:
+        if self.crop_center:
             short_egde = min(img.shape[:2])
             yy = int((img.shape[0] - short_egde) / 2)
             xx = int((img.shape[1] - short_egde) / 2)
@@ -355,7 +504,7 @@ class Clothes21MXNet(object):
         # print img.mean()
         return normed_img
 
-    def classify_image(self, img):
+    def classify_image(self, img, N):
         start = time.time()
         img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
@@ -363,12 +512,12 @@ class Clothes21MXNet(object):
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
-        # Get top5 label
-        top5 = [self.synset[pred[i]] for i in range(5)]
-        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
-        top5 = zip(top5, top5_probs)
-        print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return (True, top5, '%.3f' % (end - start)), pred[0:5]
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN = zip(topN, topN_probs)
+        print "Predictions: ", prob[pred[0:N]]
+        return  '%.3f' % (end - start), topN, pred[0:N]
 
 
 class Places2Caffe(object):
@@ -387,7 +536,7 @@ class Places2Caffe(object):
 
         MODEL_DEPLOY  = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/deploy.prototxt'
         MODEL_BINARY  = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/inception_bn_aug_iter_60000.caffemodel'
-        CATEGORY_FILE = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/categories.txt'
+        CATEGORY_FILE = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/synset.txt'
 
         logging.info('Loading net and associated files...')
         if gpu_mode:
@@ -434,7 +583,7 @@ class Places2Caffe(object):
 
             bet_result = zip(predictions, scores[indices])
             print bet_result
-            return (True, bet_result, '%.3f' % (endtime - starttime))
+            return '%.3f' % (endtime - starttime), bet_result
 
 
 class ColorsAlexnetMXNet(object):
@@ -456,13 +605,13 @@ class ColorsAlexnetMXNet(object):
         self.mean_img = np.ones([3,224,224])*127.0
 
         # Load synset (text label)
-        self.categories = [l for l in open(ROOT_PATH+'synset.txt').readlines()]
+        self.synset = [l for l in open(ROOT_PATH+'synset.txt').readlines()]
 
 
     def preprocess_image(self, img, show_img=False):
         # load image
-        #img = io.imread('http://cdn.phys.org/newman/gfx/news/hires/2012/1-bmw.jpg')
-        #print("Original Image Shape: ", img.shape)
+        if type(img) == str:
+            img = io.imread(img)
         # we crop image from center
         short_egde = min(img.shape[:2])
         yy = int((img.shape[0] - short_egde) / 2)
@@ -480,7 +629,6 @@ class ColorsAlexnetMXNet(object):
         # sub mean
         normed_img = sample - self.mean_img
         normed_img.resize(1, 3, 224, 224)
-        print img.mean()
         return normed_img
 
     def classify_image(self, img):
@@ -491,12 +639,149 @@ class ColorsAlexnetMXNet(object):
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
-        # Get top5 label
-        top5 = [self.categories[pred[i]] for i in range(5)]
-        top5_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
-        top5 = zip(top5, top5_probs)
-        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return (True, top5, '%.3f' % (end - start))
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(5)]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
+        topN = zip(topN, topN_probs)
+        return '%.3f' % (end - start), topN
+
+class CarsInception(object):
+    """
+        car classifier for 52 different brand including NotCar and Others class for
+        rarely shown car synset
+    """
+    def __init__(self, gpu_mode, crop_center=False, is_retrieval=False):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+        import mxnet as mx
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/CarsInception/'
+
+        # Load the pre-trained model
+        prefix = ROOT_PATH+"inception-0"
+        num_round = 80
+        if gpu_mode:
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+        else:
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
+
+        # Load mean file
+        self.mean_img = np.ones([3,224,224])*127.0
+
+        # Crop center flag
+        self.crop_center = crop_center
+
+        # Load synset (text label)
+        self.synset = [l for l in open(ROOT_PATH+'synset.txt').readlines()]
+
+        if is_retrieval:
+            # get internals from model's symbol
+            internals = self.model.symbol.get_internals()
+            # get feature layer symbol out of internals
+            fea_symbol = internals["global_pool_output"]
+            if gpu_mode:
+                self.feature_extractor = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                         arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                         allow_extra_params=True)
+            else:
+                self.feature_extractor = mx.model.FeedForward(ctx=mx.cpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                         arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                         allow_extra_params=True)
+
+
+    def preprocess_image(self, img, crop_center=False, show_img=False):
+        # load image
+        if type(img) == str:
+            img = io.imread(img)
+        #print("Original Image Shape: ", img.shape)
+        # we crop image from center
+        if crop_center:
+            short_egde = min(img.shape[:2])
+            yy = int((img.shape[0] - short_egde) / 2)
+            xx = int((img.shape[1] - short_egde) / 2)
+            crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        else:
+            crop_img = img
+        # resize to 224, 224
+        resized_img = transform.resize(crop_img, (224, 224))
+        if show_img:
+            io.imshow(resized_img)
+        # convert to numpy.ndarray
+        sample = np.asarray(resized_img) * 256
+        # swap axes to make image from (224, 224, 4) to (3, 224, 224)
+        sample = np.swapaxes(sample, 0, 2)
+        sample = np.swapaxes(sample, 1, 2)
+        # sub mean
+        normed_img = sample - self.mean_img
+        normed_img.resize(1, 3, 224, 224)
+        return normed_img
+
+    def classify_image(self, img, N=5):
+        start = time.time()
+        img = self.preprocess_image(img, self.crop_center)
+        # Get prediction probability of 1000 classes from model
+        prob = self.model.predict(img)[0]
+        end   = time.time()
+        # Argsort, get prediction index from largest prob to lowest
+        pred = np.argsort(prob)[::-1]
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN = zip(topN, topN_probs)
+        return '%.3f' % (end - start), topN, pred[0:N]
+
+    def feature_extraction(self, img):
+        query_img = self.preprocess_image(img, self.crop_center)
+        query_feat = self.feature_extractor.predict(query_img)
+        return query_feat
+
+    def produce_cam(self, img, class_id=None, top=-1):
+        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        import mxnet as mx
+
+        # Create CAM model outputs Global Average Pooling layer
+        internals = self.model.symbol.get_internals()
+        fea_symbol = internals['ch_concat_5b_chconcat_output']
+        CAM = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                             arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                             allow_extra_params=True)
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+
+        # Give image, preprocess and get GAP activations
+        batch = self.preprocess_image(img)
+        GAP = CAM.predict(batch).squeeze()
+        # Get fc layer weights
+        W = self.model.arg_params['fc1_weight'].asnumpy()
+        # Get class specific weights
+        class_W = W[class_id]
+        # Abs of class specific weights
+        class_W_abs = np.abs(class_W)
+        # Create empty GAP
+        class_GAP = np.zeros(GAP.shape)
+        if top > 0 :
+            top_idxs = (-class_W_abs).argsort()[0:top]
+            for count,idx in enumerate(top_idxs):
+                class_GAP[idx] = GAP[idx] * class_W_abs[idx]
+        else:
+            for count,w in enumerate(class_W_abs):
+                class_GAP[count] = GAP[count] * w
+
+        # Create CAM
+        # Find average GAP*W and normalize to 0,1 scale
+        CAM = class_GAP.sum(axis=0)
+        CAM = CAM + -1*CAM.min()
+        CAM = CAM / CAM.max()
+        assert CAM.min() == 0
+        assert CAM.max() == 1
+
+        # Resize to image size
+        CAM_resized = transform.resize(CAM, (img.shape[0], img.shape[1]), )
+
+        # plt.figure()
+        # plt.title(synset[class_id])
+        # plt.imshow(CAM_resized,cmap='cubehelix')
+        # plt.show()
+        return CAM_resized
+
 
 class LocSegNetwork(object):
     '''
