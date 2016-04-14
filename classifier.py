@@ -34,7 +34,7 @@ class ImageNet1KInceptionMXNet(object):
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
         import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/Inception/'
@@ -119,7 +119,7 @@ class ImageNet1KInceptionMXNet(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
         import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
@@ -185,7 +185,7 @@ class ImageNet1KInceptionV3MXNet(object):
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
         import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-1k-Inceptionv3/'
@@ -266,7 +266,7 @@ class ImageNet1KInceptionV3MXNet(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
         import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
@@ -325,7 +325,7 @@ class ImageNet21KInceptionMXNet(object):
             if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet_gpu')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
         import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-21k-inception/'
@@ -390,7 +390,7 @@ class ImageNet21KInceptionMXNet(object):
         return '%.3f' % (end - start), topN, pred[0:N]
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
         import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
@@ -455,7 +455,7 @@ class LystInception(object):
             if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet/python')
         import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/LystInception/'
@@ -531,7 +531,7 @@ class Places2Caffe(object):
         gpu_mode : bool
             If True model runs on GPU
         """
-        sys.path.insert(0,'/media/erogol8bit/data_hdd/Libs/caffe_bundle/caffe/python')
+        sys.path.insert(0,'/media/eightbit/data_hdd/Libs/caffe_bundle/caffe/python')
         import caffe
 
         MODEL_DEPLOY  = config.NN_MODELS_ROOT_PATH+'Models/Caffe/Places2/deploy.prototxt'
@@ -586,26 +586,36 @@ class Places2Caffe(object):
             return '%.3f' % (endtime - starttime), bet_result
 
 
-class ColorsAlexnetMXNet(object):
-    def __init__(self, gpu_mode):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+class Color43InceptionCam(object):
+    def __init__(self, gpu_mode, crop_center=False, batch_size=1):
+        """
+        Parameters
+        ----------
+        gpu_mode : bool
+            If True model runs on GPU
+        crop_center : bool, optional
+            if True, model crops the image center by resizing the image regarding
+            shortest side.
+        """
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
         import mxnet as mx
 
-        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/WanteringColorAlexnet/'
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/WateringColorInceptionCam/'
 
         # Load the pre-trained model
-        prefix = ROOT_PATH+"alexnet"
-        num_round = 21
+        prefix = ROOT_PATH+"inception-cam"
+        num_round = 17
         if gpu_mode:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.gpu(), numpy_batch_size=batch_size)
         else:
-            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=1)
+            self.model = mx.model.FeedForward.load(prefix, num_round, ctx=mx.cpu(), numpy_batch_size=batch_size)
 
-        # Load mean file
-        self.mean_img = np.ones([3,224,224])*127.0
+        self.mean_img = self.mean_img = np.ones([3,224,224])*127.0
+
+        self.crop_center = crop_center
 
         # Load synset (text label)
-        self.synset = [l for l in open(ROOT_PATH+'synset.txt').readlines()]
+        self.synset = [l.strip().replace('+', ' ') for l in open(ROOT_PATH+'synset.txt').readlines()]
 
 
     def preprocess_image(self, img, show_img=False):
@@ -613,10 +623,13 @@ class ColorsAlexnetMXNet(object):
         if type(img) == str:
             img = io.imread(img)
         # we crop image from center
-        short_egde = min(img.shape[:2])
-        yy = int((img.shape[0] - short_egde) / 2)
-        xx = int((img.shape[1] - short_egde) / 2)
-        crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        if self.crop_center:
+            short_egde = min(img.shape[:2])
+            yy = int((img.shape[0] - short_egde) / 2)
+            xx = int((img.shape[1] - short_egde) / 2)
+            crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+        else:
+            crop_img = img
         # resize to 224, 224
         resized_img = transform.resize(crop_img, (224, 224))
         if show_img:
@@ -631,19 +644,70 @@ class ColorsAlexnetMXNet(object):
         normed_img.resize(1, 3, 224, 224)
         return normed_img
 
-    def classify_image(self, img):
+    def classify_image(self, img, preprocess=True, N=5):
         start = time.time()
-        img = self.preprocess_image(img)
+        if preprocess:
+            img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
         prob = self.model.predict(img)[0]
         end   = time.time()
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
         # Get topN label
-        topN = [self.synset[pred[i]] for i in range(5)]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:5]]]
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
         topN = zip(topN, topN_probs)
-        return '%.3f' % (end - start), topN
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return '%.3f' % (end - start), topN, pred[0:N]
+
+    def produce_cam(self, img, class_id=None, top=-1):
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
+        import mxnet as mx
+
+        # Create CAM model outputs Global Average Pooling layer
+        internals = self.model.symbol.get_internals()
+        fea_symbol = internals['relu_conv_cam_output']
+        CAM = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                             arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                             allow_extra_params=True)
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+
+        # Give image, preprocess and get GAP activations
+        batch = self.preprocess_image(img)
+        GAP = CAM.predict(batch).squeeze()
+        # Get fc layer weights
+        W = self.model.arg_params['fc1_weight'].asnumpy()
+        # Get class specific weights
+        class_W = W[class_id]
+        # Create empty GAP
+        class_GAP = np.zeros(GAP.shape)
+        if top > 0 :
+            top_idxs = (-class_W).argsort()[0:top]
+            for count,idx in enumerate(top_idxs):
+                class_GAP[idx] = GAP[idx] * class_W[idx]
+        else:
+            for count,w in enumerate(class_W):
+                class_GAP[count] = GAP[count] * w
+
+        # Create CAM
+        # Find average GAP*W and normalize to 0,1 scale
+        CAM = class_GAP.sum(axis=0)
+        CAM = CAM + -1*CAM.min() # or CAM = CAM[CAM<0] for more sparse mask inly centric to interest regions
+
+        CAM = CAM / CAM.max()
+        print CAM.min()
+        assert CAM.min() >= 0
+        assert CAM.max() <= 1
+
+        # Resize to image size
+        CAM_resized = transform.resize(CAM, (img.shape[0], img.shape[1]), )
+
+        # plt.figure()
+        # plt.title(synset[class_id])
+        # plt.imshow(CAM_resized,cmap='cubehelix')
+        # plt.show()
+        return CAM_resized
 
 class CarsInception(object):
     """
@@ -651,7 +715,7 @@ class CarsInception(object):
         rarely shown car synset
     """
     def __init__(self, gpu_mode, crop_center=False, is_retrieval=False):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet/python')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet/python')
         import mxnet as mx
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/CarsInception/'
 
@@ -734,7 +798,7 @@ class CarsInception(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/erogol8bit/data_hdd/Libs/mxnet')
+        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
         import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
@@ -790,12 +854,12 @@ class LocSegNetwork(object):
         Results are not perfect but still useful.
     '''
     def __init__(self, gpu_mode=1, is_loc=1, is_seg=1):
-        sys.path.insert(0,'/media/erogol8bit/data_hdd/Libs/caffe_bundle/caffe/python')
+        sys.path.insert(0,'/media/eightbit/data_hdd/Libs/caffe_bundle/caffe/python')
         import caffe
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH + "Models/Caffe/LocSegModel/"
         # Load mean image
-        mean_img = np.load('/media/erogol8bit/data_hdd/Libs/nips14_loc_seg_testonly/Caffe_Segmentation/segscripts/models/mean.npy')
+        mean_img = np.load('/media/eightbit/data_hdd/Libs/nips14_loc_seg_testonly/Caffe_Segmentation/segscripts/models/mean.npy')
         mean_img = mean_img[:, 14:241,14:241 ]
         self.mean_img = mean_img
 

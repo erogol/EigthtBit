@@ -1,10 +1,10 @@
 import numpy as np
 import urllib
-from skimage.io import imread, imsave
-import multiprocessing 
-from multiprocessing import Pool
 import dill
-
+import cStringIO
+from PIL import Image as PILImage
+from multiprocessing import Pool
+from skimage.io import imread, imsave
 
 def imgread(url):
     img = imread(url)
@@ -13,54 +13,29 @@ def imgread(url):
 def imgsave(img, img_path):
     imsave(img_path, img)
 
+def base642img(img_base64):
+    strIO = cStringIO(img_base64)
+    img = io.imread(strIO)
+    return img
+
+def img2base64(img):
+    """Creates an image embedded in HTML base64 format."""
+    img_pil = PILImage.fromarray(img.astype('uint8'))
+
+    # baseheight = 480
+    # hpercent = (baseheight / float(image_pil.size[1]))
+    # wsize = int((float(image_pil.size[0]) * float(hpercent)))
+    # image_pil = image_pil.resize((wsize, baseheight), PILImage.ANTIALIAS)
+    #img.save('resized_image.jpg')
+    #image_pil = image_pil.resize((256, 256))
+    string_buf = cStringIO.StringIO()
+    img_pil.save(string_buf, format='jpeg')
+    data = string_buf.getvalue().encode('base64').replace('\n', '')
+    return 'data:image/jpeg;base64,' + data
+
 
 def save_obj(obj, file_path):
     dill.dump(obj, open(file_path,'wb'))
 
 def load_obj(file_path):
     return dill.load(open(file_path, 'rb'))
-
-def save_feature(file_path, feat_vec, check_exist = False):
-	"""
-		file_path - file path to output_ext
-		feat_vec - feature vector in numpy format
-		check_exist - check whether the file exist
-	"""
-	if check_exist and os.path.exists(file_path):
-			print 'Exists : ',file_path
-			return 
-	np.savetxt(file_path, feat_vec, delimiter=',', fmt='%.4e')
-
-def _read_file(file_path, count):
-    if count % 250 == 0:
-        print multiprocessing.current_process(), ' --- ', count 
-    x = np.loadtxt(file_path, delimiter='\n')
-    x = x.astype('float64')
-    return x
-
-def _read_file_helper(args):
-    return _read_file(*args)
-
-def read_files(file_paths, num_proc):
-    """
-        Read files from the givne file_path list, possibly with 
-        multiprocessing support
-    """
-    args = [(file_path, count) for count,file_path in enumerate(file_paths)]
-    data = []
-    if num_proc > 1:
-        p = Pool(num_proc)
-        try:
-            data = p.map(_read_file_helper, args)
-            p.close()
-            return data
-        except KeyboardInterrupt:
-            print 'parent received control-c'
-            return
-    else:
-        x = np.loadtxt(args[0][0], delimiter='\n')
-        data = np.zeros([len(args), x.shape[0]])
-        for arg in args:
-            x = _read_file(arg[0], arg[1])
-            data[arg[1],:] = x[None,:]
-        return data
