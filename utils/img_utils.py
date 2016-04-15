@@ -52,24 +52,24 @@ def imggray(img):
 def create_img_grids(img, num_grids, center=False):
     """
         Creates img patch grids
-        
+
         img       : 2D or 3D array of an image
         num_grids : A tuple of number of horizontal and vertical grids
-        center    : Take a center grid 
+        center    : Take a center grid
     """
-    
+
     ver_num = num_grids[0]
     hor_num = num_grids[1]
-    
+
     img_size = img.shape[0]
     img_width = img.shape[1]
-    
+
     patches = []
 
     if num_grids != [0,0]:
         hor_patch_size = np.ceil(img_width / hor_num)
         ver_patch_size = np.floor(img_size / ver_num)
-        
+
         for j in range(ver_num):
             for i in range(hor_num):
                 hor_start_indx = i*hor_patch_size
@@ -114,7 +114,7 @@ def _extract_random_patch(img_path, num_patches, patch_size, img_size, gray,  co
 def extract_random_patches(image_paths, num_patches, patch_size, img_size = None, gray = True,num_proc=5):
     """
         Given the list of img paths, it generated desired number of
-        random img patches. Final patches has dimension of 
+        random img patches. Final patches has dimension of
         num_patches , patch_size , patch_size , <channels> if gray == false
     """
     if gray:
@@ -139,12 +139,12 @@ def extract_random_patches(image_paths, num_patches, patch_size, img_size = None
 
     else:
         p = ProcessingPool(num_proc)
-        patches = p.map(_extract_random_patch, 
-                    image_paths, 
-                    [num_patches]*num_patches, 
+        patches = p.map(_extract_random_patch,
+                    image_paths,
+                    [num_patches]*num_patches,
                     [patch_size]*num_patches,
                     [img_size]*num_patches,
-                    [gray]*num_patches, 
+                    [gray]*num_patches,
                     range(num_patches),
                     [False]*num_patches)
 
@@ -155,9 +155,9 @@ def extract_random_patches2(image_paths, num_patches, patch_size, img_size = Non
     rem_patches =  num_patches % len(image_paths)
 
     if gray:
-        patches = np.empty([num_patches,patch_size**2]) 
+        patches = np.empty([num_patches,patch_size**2])
     else:
-        patches = np.empty([num_patches,3*(patch_size**2)]) 
+        patches = np.empty([num_patches,3*(patch_size**2)])
     counter = 0
     pb = ProgressBar(maxval=len(image_paths))
     for c, image_path in enumerate(image_paths):
@@ -170,30 +170,30 @@ def extract_random_patches2(image_paths, num_patches, patch_size, img_size = Non
             assert image.max() >= 1
         else:
             assert image.max() > 1
-        
+
         col_size_h = (image.shape[0]-patch_size)/1+1
         assert col_size_h != 0
         col_size_w = (image.shape[1]-patch_size)/1+1
         assert col_size_w != 0
-        
+
         patches_tmp = np.empty([col_size_h,col_size_w,(patch_size**2)*n_channels], np.float64)
-       
+
         if gray:
             im2col(image.astype(np.float64)[None,:,:,None], patches_tmp, patch_size, 1)
         else:
             im2col(image.astype(np.float64)[None,:], patches_tmp, patch_size, 1)
-       
+
         patches_tmp = patches_tmp.reshape([col_size_h*col_size_w,(patch_size**2)*n_channels])
-        
+
         if c+1 == len(image_paths):
             indices = np.random.randint(0,patches_tmp.shape[0],num_patches_per_img+rem_patches)
         else:
             indices = np.random.randint(0,patches_tmp.shape[0],num_patches_per_img)
-        
+
         sel_patches = patches_tmp[indices,:]
         assert sel_patches.shape[0] > 0
         assert sel_patches.shape[1] > 0
-        
+
         if c+1 == len(image_paths):
             patches[counter:counter+num_patches_per_img+rem_patches,:] = sel_patches
         else:
@@ -202,4 +202,3 @@ def extract_random_patches2(image_paths, num_patches, patch_size, img_size = Non
         pb.update(c)
     pb.finish()
     return patches
-               

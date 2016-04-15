@@ -110,8 +110,11 @@ class ImageNet1KInceptionMXNet(object):
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
-        return '%.3f' % (end - start), topN, pred[0:N]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return '%.3f' % (end - start), topN
+
 
     def feature_extraction(self, img):
         query_img = self.preprocess_image(img, show_img=False)
@@ -257,8 +260,10 @@ class ImageNet1KInceptionV3MXNet(object):
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
-        return  '%.3f' % (end - start), topN, pred[0:N]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return '%.3f' % (end - start), topN
 
     def feature_extraction(self, img):
         query_img = self.preprocess_image(img)
@@ -385,9 +390,10 @@ class ImageNet21KInceptionMXNet(object):
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return '%.3f' % (end - start), topN, pred[0:N]
+        return '%.3f' % (end - start), topN
 
     def produce_cam(self, img, class_id=None, top=-1):
         sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
@@ -504,7 +510,7 @@ class LystInception(object):
         # print img.mean()
         return normed_img
 
-    def classify_image(self, img, N):
+    def classify_image(self, img, N=5):
         start = time.time()
         img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
@@ -515,9 +521,9 @@ class LystInception(object):
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
-        print "Predictions: ", prob[pred[0:N]]
-        return  '%.3f' % (end - start), topN, pred[0:N]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        return '%.3f' % (end - start), topN
 
 
 class Places2Caffe(object):
@@ -570,19 +576,18 @@ class Places2Caffe(object):
             ])
         self.labels = labels_df['name'].values
 
-    def classify_image(self, image):
+    def classify_image(self, image, N=5):
             starttime = time.time()
             self.net.blobs['data'].data[...] = self.transformer.preprocess('data', image/255.0)
             scores = self.net.forward()
             scores = self.net.blobs['prob'].data[0].flatten()
             endtime = time.time()
 
-            indices = self.net.blobs['prob'].data[0].flatten().argsort()[-1:-6:-1]
-            print "INDICES: ",indices
-            predictions = self.labels[indices]
-
-            bet_result = zip(predictions, scores[indices])
-            print bet_result
+            indices = (-self.net.blobs['prob'].data[0].flatten()).argsort()
+            predictions = self.labels[indices[0:N]]
+            scores = ["%.2f" % score for score in scores[indices[0:N]]]
+            bet_result = zip(predictions, indices[:N])
+            bet_result = [ bet + (scores[c],) for c,bet in enumerate(bet_result)]
             return '%.3f' % (endtime - starttime), bet_result
 
 
@@ -656,9 +661,9 @@ class Color43InceptionCam(object):
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
-        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
-        return '%.3f' % (end - start), topN, pred[0:N]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        return '%.3f' % (end - start), topN
 
     def produce_cam(self, img, class_id=None, top=-1):
         sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
@@ -787,10 +792,11 @@ class CarsInception(object):
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
         # Get topN label
-        topN = [self.synset[pred[i]] for i in range(N)]
+        topN = [self.categories[pred[i]] for i in range(N)]
         topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
-        topN = zip(topN, topN_probs)
-        return '%.3f' % (end - start), topN, pred[0:N]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        return '%.3f' % (end - start), topN
 
     def feature_extraction(self, img):
         query_img = self.preprocess_image(img, self.crop_center)
