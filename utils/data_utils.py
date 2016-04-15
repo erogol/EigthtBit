@@ -213,13 +213,17 @@ def remove_rotten_imgs(img_paths, verbose=False):
           remove_count += 1
   print "In total ", remove_count, " images deleted !!!"
 
-def name_img(img):
+def name_img_dhash(img):
   """
     Create a unique name for the given image as its hexadecimal
     match of the dhash value
   """
   str_list = ''.join(str(e) for e in list(dhash(img)[0]))
   return str(hex(int(str_list,2)))
+
+def name_img_md5(img):
+    img_idx = md5(img)
+    return img_idx
 
 def rename_imgs(img_paths, hash_func = 'dhash'):
   for img_path in img_paths:
