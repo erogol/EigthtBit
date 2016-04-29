@@ -1,6 +1,6 @@
 from io_utils import imgread
 from img_utils import imgresize
-from hash_utils import dhash, phash
+from hash_utils import dhash, phash, md5_hash
 import os
 import numpy as np
 
@@ -222,7 +222,7 @@ def name_img_dhash(img):
   return str(hex(int(str_list,2)))
 
 def name_img_md5(img):
-    img_idx = md5(img)
+    img_idx = md5_hash(img)
     return img_idx
 
 def rename_imgs(img_paths, hash_func = 'dhash'):
