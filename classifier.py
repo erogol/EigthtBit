@@ -10,6 +10,7 @@ from skimage import io, transform
 from matplotlib import pylab as plt
 from config import Config
 from utils import img_utils
+import mxnet as mx
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -34,8 +35,6 @@ class ImageNet1KInceptionMXNet(object):
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/Inception/'
 
@@ -122,8 +121,6 @@ class ImageNet1KInceptionMXNet(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()
@@ -188,8 +185,6 @@ class ImageNet1KInceptionV3MXNet(object):
         is_retrieval : bool, optional
             if True, model constructs feature extractor.
         """
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
-        import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-1k-Inceptionv3/'
 
@@ -271,8 +266,6 @@ class ImageNet1KInceptionV3MXNet(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
-        import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()
@@ -330,8 +323,8 @@ class ImageNet21KInceptionMXNet(object):
             if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet_gpu')
-        import mxnet as mx
+
+
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/imagenet-21k-inception/'
 
@@ -396,8 +389,8 @@ class ImageNet21KInceptionMXNet(object):
         return '%.3f' % (end - start), topN
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
+
+
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()
@@ -462,7 +455,7 @@ class LystInception(object):
             shortest side.
         """
         sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet/python')
-        import mxnet as mx
+
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/LystInception/'
 
@@ -602,8 +595,6 @@ class Color43InceptionCam(object):
             if True, model crops the image center by resizing the image regarding
             shortest side.
         """
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/WateringColorInceptionCam/'
 
@@ -666,8 +657,6 @@ class Color43InceptionCam(object):
         return '%.3f' % (end - start), topN
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()
@@ -720,8 +709,6 @@ class CarsInception(object):
         rarely shown car synset
     """
     def __init__(self, gpu_mode, crop_center=False, is_retrieval=False):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet/python')
-        import mxnet as mx
         ROOT_PATH = config.NN_MODELS_ROOT_PATH+'Models/MxNet/CarsInception/'
 
         # Load the pre-trained model
@@ -804,8 +791,6 @@ class CarsInception(object):
         return query_feat
 
     def produce_cam(self, img, class_id=None, top=-1):
-        sys.path.insert(0, '/media/eightbit/data_hdd/Libs/mxnet')
-        import mxnet as mx
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()

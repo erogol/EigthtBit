@@ -2,7 +2,7 @@ import numpy as np
 from skimage.io import imread, imsave
 from skimage.transform import resize
 from skimage.color import rgb2gray
-from pathos.multiprocessing import ProcessingPool, ThreadingPool
+# from pathos.multiprocessing import ProcessingPool, ThreadingPool
 from io_utils import imgread
 from progressbar import ProgressBar
 from ..cpp.wrapper import im2col
