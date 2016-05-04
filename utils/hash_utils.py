@@ -56,6 +56,6 @@ def dhash(img, hash_size = 8):
     # img_signature = '%016X' % long(str_rep, 2)
     return str_rep, diff.astype('uint8')
 
-def md5(img):
+def md5_hash(img):
     img_idx = hashlib.md5(img.tostring()).hexdigest()
     return img_idx

@@ -33,8 +33,8 @@ def base642img(img_base64):
     outputs:
         img - numpy image array
     """
-    strIO = cStringIO(img_base64)
-    img = io.imread(strIO)
+    strIO = cStringIO.StringIO(img_base64)
+    img = imread(strIO)
     return img
 
 def img2base64(img):
