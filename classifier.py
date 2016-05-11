@@ -313,7 +313,7 @@ class ImageNet1KInceptionV3MXNet(object):
         return CAM_resized
 
 class ImageNet21KInceptionMXNet(object):
-    def __init__(self, gpu_mode, crop_center=False, batch_size=1):
+    def __init__(self, gpu_mode, crop_center=False, is_retrieval=0, batch_size=1):
         """
         Parameters
         ----------
@@ -342,6 +342,20 @@ class ImageNet21KInceptionMXNet(object):
 
         # Load synset (text label)
         self.synset = [l.strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
+
+        if is_retrieval:
+            # get internals from model's symbol
+            internals = self.model.symbol.get_internals()
+            # get feature layer symbol out of internals
+            fea_symbol = internals["global_pool_output"]
+            if gpu_mode:
+                self.feature_extractor = mx.model.FeedForward(ctx=mx.gpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                         arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                         allow_extra_params=True)
+            else:
+                self.feature_extractor = mx.model.FeedForward(ctx=mx.cpu(), symbol=fea_symbol, numpy_batch_size=1,
+                                         arg_params=self.model.arg_params, aux_params=self.model.aux_params,
+                                         allow_extra_params=True)
 
 
     def preprocess_image(self, img, show_img=False):
@@ -388,9 +402,12 @@ class ImageNet21KInceptionMXNet(object):
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
         return '%.3f' % (end - start), topN
 
+    def feature_extraction(self, img):
+        query_img = self.preprocess_image(img)
+        query_feat = self.feature_extractor.predict(query_img)
+        return query_feat
+
     def produce_cam(self, img, class_id=None, top=-1):
-
-
 
         # Create CAM model outputs Global Average Pooling layer
         internals = self.model.symbol.get_internals()
