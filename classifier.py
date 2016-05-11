@@ -108,7 +108,7 @@ class ImageNet1KInceptionMXNet(object):
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
@@ -254,7 +254,7 @@ class ImageNet1KInceptionV3MXNet(object):
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
@@ -396,7 +396,7 @@ class ImageNet21KInceptionMXNet(object):
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
         topN = [top_str[top_str.find(' ')::].split(',')[0] for top_str in topN]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
@@ -530,7 +530,7 @@ class LystInception(object):
         pred = np.argsort(prob)[::-1]
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         return '%.3f' % (end - start), topN
@@ -668,7 +668,7 @@ class Color43InceptionCam(object):
         pred = np.argsort(prob)[::-1]
         # Get topN label
         topN = [self.synset[pred[i]] for i in range(N)]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         return '%.3f' % (end - start), topN
@@ -797,7 +797,7 @@ class CarsInception(object):
         pred = np.argsort(prob)[::-1]
         # Get topN label
         topN = [self.categories[pred[i]] for i in range(N)]
-        topN_probs = ["%.2f" % pr for pr in prob[pred[0:N]]]
+        topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
         return '%.3f' % (end - start), topN
