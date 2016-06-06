@@ -111,6 +111,39 @@ def _extract_random_patch(img_path, num_patches, patch_size, img_size, gray,  co
             cont_flag = False
     return patch
 
+def thumbnail(img, size=150):
+    """
+        Resize given image by the shortest edge
+    """
+    from math import floor
+    width, height = img.shape[1], img.shape[0]
+
+    if width == height:
+        img = resize(img, [size, size])
+
+    elif height > width:
+        ratio = float(height)/float(width)
+        newheight = ratio * size
+        img = resize(img, [int(floor(newheight)), size ])
+
+    elif width > height:
+        ratio = float(width) / float(height)
+        newwidth = ratio * size
+        img = resize(img, [size, int(floor(newwidth))])
+
+    img = (img*255).astype('uint8')
+    return img
+
+def crop_center(img):
+    """
+        Crop image by center with the size of shortest edge
+    """
+    short_egde = min(img.shape[:2])
+    yy = int((img.shape[0] - short_egde) / 2)
+    xx = int((img.shape[1] - short_egde) / 2)
+    crop_img = img[yy : yy + short_egde, xx : xx + short_egde]
+    return crop_img
+
 def extract_random_patches(image_paths, num_patches, patch_size, img_size = None, gray = True,num_proc=5):
     """
         Given the list of img paths, it generated desired number of

@@ -1,12 +1,20 @@
 import os
 import sys
-import numpy as np
 import pandas as pd
 import cPickle
 import time
 
+# for torch models
+import lutorpy as lua
+import numpy as np
+require('nn')
+require('cunn')
+require('cudnn')
+lua.eval("torch.setdefaulttensortype('torch.FloatTensor')")
+
 import logging
 from skimage import io, transform
+from eight_bit.utils.img_utils import thumbnail, crop_center
 from matplotlib import pylab as plt
 from config import Config
 from utils import img_utils
@@ -1025,3 +1033,106 @@ class LocSegNetwork(object):
             bot = y_idxs.max()
             img_seg = img_seg[top:bot, left:right, :]
         return seg_mask, img_seg
+
+class TorchModel(object):
+    '''
+    Parent class for all torch Models
+    '''
+
+    def __init__(self, gpu_mode=0, model_path=None, model_file_name=None):
+        """
+        Parameters
+        ----------
+        gpu_mode : bool
+            If True model runs on GPU
+        crop_center : bool, optional
+            if True, model crops the image center by resizing the image regarding
+            shortest side.
+        is_retrieval : bool, optional
+            if True, model constructs feature extractor.
+        """
+
+        ROOT_PATH = config.NN_MODELS_ROOT_PATH + model_path
+        self.gpu_mode = gpu_mode
+
+        # Load the pre-trained model
+        if model_file_name ==  None:
+            model_path = os.path.join(ROOT_PATH,"model_cpu.t7")
+        else:
+            model_path = os.path.join(ROOT_PATH, model_file_name)
+        self.model = torch.load(model_path)
+        self.model._add(nn.SoftMax())
+
+        if gpu_mode:
+            self.model._cuda()
+
+        self.model._evaluate()
+
+        # Load mean file
+        self.mean = np.array([ 0.485,  0.456,  0.406])
+        self.std  = np.array([ 0.229,  0.224,  0.225])
+
+        # Load synset (text label)
+        self.synset = [l.split(',')[0] for l in open(ROOT_PATH+'synset.txt').readlines()]
+
+    def preprocess_image(self, img):
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(img)
+        else:
+            img = img
+
+        # resize image by shortest edge
+        img_resized = thumbnail(img, 224)/ float(255)
+
+        # color normalization
+        img_norm = img_resized - self.mean
+        img_norm /= self.std
+
+        # center cropping
+        img_crop = crop_center(img_norm)
+
+        # format img dimensions
+        img_crop = img_crop.transpose([2,0,1])[None,:]
+
+        assert img_crop.ndim == 4
+
+        # pass data to torch and convert douple to float
+        x = torch.fromNumpyArray(img_crop)
+        x = x._float()
+        return x
+
+    def classify_image(self, img, N=2):
+        start = time.time()
+        img = self.preprocess_image(img)
+        # Get prediction probability of 1000 classes from model
+        if self.gpu_mode:
+            prob = self.model._forward(img._cuda())
+        else:
+            prob = self.model._forward(img)
+        prob = prob.asNumpyArray()[0]
+        end   = time.time()
+        # Argsort, get prediction index from largest prob to lowest
+        pred = np.argsort(prob)[::-1]
+        # Get topN label
+        topN = [self.synset[pred[i]] for i in range(N)]
+        topN_probs = prob[pred[0:N]]
+        topN = zip(topN, pred[0:N])
+        topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
+        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
+        return '%.3f' % (end - start), topN
+
+class NsfwResnetTorch(TorchModel):
+    """
+    Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
+    challenge. It is able to extract features and classify the given image
+    """
+    def __init__(self, gpu_mode=0):
+        super(NsfwResnetTorch, self).__init__(gpu_mode, model_path='Models/Torch/NSFW_resnet/')
+
+class ImageNetResnetTorch(TorchModel):
+    """
+    Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
+    challenge. It is able to extract features and classify the given image
+    """
+    def __init__(self, gpu_mode=0):
+        super(ImageNetResnetTorch, self).__init__(gpu_mode, model_path='Models/Torch/ImageNetResNet/', model_file_name='resnet-101_cpu.t7')
