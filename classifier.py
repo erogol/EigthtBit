@@ -804,7 +804,7 @@ class CarsInception(object):
         # Argsort, get prediction index from largest prob to lowest
         pred = np.argsort(prob)[::-1]
         # Get topN label
-        topN = [self.categories[pred[i]] for i in range(N)]
+        topN = [self.synset[pred[i]] for i in range(N)]
         topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
@@ -1073,7 +1073,7 @@ class TorchModel(object):
         self.std  = np.array([ 0.229,  0.224,  0.225])
 
         # Load synset (text label)
-        self.synset = [l.split(',')[0] for l in open(ROOT_PATH+'synset.txt').readlines()]
+        self.synset = [l.split(',')[0].strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
 
     def preprocess_image(self, img):
         if type(img) is str or type(img) is unicode:
