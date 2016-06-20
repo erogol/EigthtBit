@@ -41,7 +41,7 @@ def phash(img, digitize=True):
     else:
         return hash_val.flatten()
 
-def dhash(img, hash_size = 8, digitize=True):
+def dhash(img, hash_size=8, digitize=True):
     """
       Computes dhash value for the given image. It is good for detecting
       duplicate images in differetn sizes and possible deformations

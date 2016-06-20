@@ -1122,17 +1122,13 @@ class TorchModel(object):
         return '%.3f' % (end - start), topN
 
 class NsfwResnetTorch(TorchModel):
-    """
-    Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
-    challenge. It is able to extract features and classify the given image
-    """
     def __init__(self, gpu_mode=0):
         super(NsfwResnetTorch, self).__init__(gpu_mode, model_path='Models/Torch/NSFW_resnet/')
 
 class ImageNetResnetTorch(TorchModel):
-    """
-    Interface for pretrained mxnet inception model on 1000 concepts used by ImageNet
-    challenge. It is able to extract features and classify the given image
-    """
     def __init__(self, gpu_mode=0):
         super(ImageNetResnetTorch, self).__init__(gpu_mode, model_path='Models/Torch/ImageNetResNet/', model_file_name='resnet-101_cpu.t7')
+
+class FoodResnetTorch(TorchModel):
+    def __init__(self, gpu_mode=0):
+        super(FoodResnetTorch, self).__init__(gpu_mode, model_path='Models/Torch/Food/')

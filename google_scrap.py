@@ -62,7 +62,7 @@ class timeout:
 class GoogleScrapper(object):
     def __init__(self, query, num_imgs, img_out_path, html_out_path):
         self.num_imgs = num_imgs
-        self.query = query
+        self.query = query.replace(" ", "+')
         self.img_out_path = img_out_path
         self.html_out_path = html_out_path
 
@@ -79,11 +79,13 @@ class GoogleScrapper(object):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        # Google Chrome
-        # driver = webdriver.Chrome()
-
         # Firefox
-        driver = webdriver.Firefox()
+        try:
+            driver = webdriver.Firefox()
+        except:
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument('--no-sandbox')
+            driver = webdriver.Chrome('/usr/local/bin/chromedriver', chrome_options=chrome_options)
 
         # ------------------------------
         # The actual test scenario: Test the codepad.org code execution service.
