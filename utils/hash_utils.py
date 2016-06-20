@@ -36,7 +36,7 @@ def phash(img, digitize=True):
     if digitize:
         str_rep = [ str(int(val)) for val in list(hash_val.flatten())]
         str_rep = ''.join(str_rep)
-        img_signature = int(str_rep,2)
+        img_signature = format(int(str_rep,2),'x')
         return img_signature, hash_val.flatten()
     else:
         return hash_val.flatten()

@@ -8,8 +8,11 @@ import time
 import lutorpy as lua
 import numpy as np
 require('nn')
-require('cunn')
-require('cudnn')
+try:
+    require('cunn')
+    require('cudnn')
+except:
+    print "No CUDA support. cunn and cudnn not imported!"
 lua.eval("torch.setdefaulttensortype('torch.FloatTensor')")
 
 import logging
