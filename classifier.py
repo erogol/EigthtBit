@@ -1042,7 +1042,7 @@ class TorchModel(object):
     Parent class for all torch Models
     '''
 
-    def __init__(self, gpu_mode=0, model_path=None, model_file_name=None):
+    def __init__(self, gpu_mode=0, model_path=None, model_file_name=None, N=5):
         """
         Parameters
         ----------
@@ -1057,6 +1057,9 @@ class TorchModel(object):
 
         ROOT_PATH = config.NN_MODELS_ROOT_PATH + model_path
         self.gpu_mode = gpu_mode
+
+        # number of results returned
+        self.N = N
 
         # Load the pre-trained model
         if model_file_name ==  None:
@@ -1104,7 +1107,12 @@ class TorchModel(object):
         x = x._float()
         return x
 
-    def classify_image(self, img, N=2):
+    def classify_image(self, img, N=None):
+        # set number of results ned to be returned
+        if N == None:
+            N = self.N
+        if N > len(self.synset):
+            N = len(self.synset)
         start = time.time()
         img = self.preprocess_image(img)
         # Get prediction probability of 1000 classes from model
