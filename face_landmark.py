@@ -133,8 +133,9 @@ class Landmarker(object):
         # level-2
         landmark = self._level(image, bbox, landmark, self.level2, [0.16, 0.18])
         if mode == 'fast':
-            return landmark, True
+            return list(landmark), True
         landmark = self._level(image, bbox, landmark, self.level3, [0.11, 0.12])
+        return list(landmark), True
 
     def detectLandmarks(self, img, draw = False):
         """
@@ -152,18 +153,21 @@ class Landmarker(object):
             bbox = bbox.subBBox(0.1, 0.9, 0.2, 1)
             bboxes.append(bbox)
             landmark, status = self.detectLandmark(gray, bbox)
-            landmarks.append(bbox.reprojectLandmark(landmark))
+            landmark = bbox.reprojectLandmark(landmark)
+            landmark = [list(at) for at in landmark]
+            print landmark
+            landmarks.append(landmark)
 
         if draw:
             for i in range(len(bboxes)):
                 img = self.drawLandmark(img, bboxes[i], landmarks[i])
-            return bboxes, list(landmarks), img
+            return bboxes, landmarks, img
         else:
-            return bboxes, list(landmark)
+            return bboxes, landmarks
 
     def drawLandmark(self, img, bbox, landmark):
         cv2.rectangle(img, (bbox.left, bbox.top), (bbox.right, bbox.bottom), (0,0,255), 2)
-        for x, y in landmark[3:4]:
+        for x, y in landmark:
             cv2.circle(img, (int(x), int(y)), 1, (0,255,0), -1)
         return img
 
@@ -194,10 +198,10 @@ class Landmarker(object):
         """
         point_x = bbox.x + point[0] * bbox.w
         point_y = bbox.y + point[1] * bbox.h
-        patch_left = point_x - bbox.w * padding
-        patch_right = point_x + bbox.w * padding
-        patch_top = point_y - bbox.h * padding
-        patch_bottom = point_y + bbox.h * padding
+        patch_left = int(point_x - bbox.w * padding)
+        patch_right = int(point_x + bbox.w * padding)
+        patch_top = int(point_y - bbox.h * padding)
+        patch_bottom = int(point_y + bbox.h * padding)
         patch = img[patch_top: patch_bottom+1, patch_left: patch_right+1]
         patch_bbox = BBox([patch_left, patch_right, patch_top, patch_bottom])
         return patch, patch_bbox
