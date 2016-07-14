@@ -587,15 +587,11 @@ class Places2Caffe(object):
         # set net to batch size of 1
         self.net.blobs['data'].reshape(1,3,224,224)
 
-        with open(CATEGORY_FILE) as f:
-            labels_df = pd.DataFrame([
-                {
-                    'synset_id': l.strip().split(' ')[1],
-                    'name':  l.strip().split(' ')[0].split('/')[-1]
-                }
-                for l in f.readlines()
-            ])
-        self.labels = labels_df['name'].values
+        self.labels = []
+        f = open(CATEGORY_FILE)
+        for l in f:
+            self.labels.append(l.strip().replace('_', ' ').replace('/', ' '))
+        print self.labels
 
     def classify_image(self, image, N=5):
             starttime = time.time()
@@ -605,7 +601,7 @@ class Places2Caffe(object):
             endtime = time.time()
 
             indices = (-self.net.blobs['prob'].data[0].flatten()).argsort()
-            predictions = self.labels[indices[0:N]]
+            predictions = [self.labels[idx] for idx in indices[0:N]]
             scores = ["%.2f" % score for score in scores[indices[0:N]]]
             bet_result = zip(predictions, indices[:N])
             bet_result = [ bet + (scores[c],) for c,bet in enumerate(bet_result)]
