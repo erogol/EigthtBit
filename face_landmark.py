@@ -94,6 +94,7 @@ class BBox(object):
             crop img with left,right,top,bottom
             **Make Sure is not out of box**
         """
+        # pad image left
         return img[self.top:self.bottom+1, self.left:self.right+1]
 
 
@@ -125,7 +126,9 @@ class Landmarker(object):
         """
         if not isinstance(bbox, BBox) or image is None:
             return None, False
+        print image.shape
         face = bbox.cropImage(image)
+        print face.shape
         face = cv2.resize(face, (39, 39)).reshape((1, 1, 39, 39))
         face = self._processImage(face)
         # level-1, only F in implemented
@@ -149,13 +152,12 @@ class Landmarker(object):
 
         bboxes = []
         landmarks = []
-        for bbox in self.fd.detectFace(gray):
+        for bbox in self.fd.detectFaces(img):
             bbox = bbox.subBBox(0.1, 0.9, 0.2, 1)
             bboxes.append(bbox)
             landmark, status = self.detectLandmark(gray, bbox)
             landmark = bbox.reprojectLandmark(landmark)
             landmark = [list(at) for at in landmark]
-            print landmark
             landmarks.append(landmark)
 
         if draw:
@@ -164,6 +166,38 @@ class Landmarker(object):
             return bboxes, landmarks, img
         else:
             return bboxes, landmarks
+
+    def detectLandmarkLargestFace(self, img, draw = False):
+        """
+            detect landmarks in `src` and store the result in `dst`
+        """
+        if type(img) is str or type(img) is unicode:
+            img = io.imread(src)
+        else:
+            img = img
+        bbox = self.fd.detectLargestFace(img)
+
+        if bbox.left < 0:
+            pad_width = np.abs(bbox.left)
+            img = np.pad(img, ((0,0), (pad_width,0), (0,0)), mode='constant', constant_values=0)
+            bbox.left = 0
+        if bbox.top < 0:
+            pad_top = np.abs(bbox.top)
+            img = np.pad(img, ((pad_top,0), (0,0), (0,0)), mode='constant', constant_values=0)
+            bbox.top = 0
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        bbox = bbox.subBBox(0.1, 0.9, 0.2, 1)
+        landmark, status = self.detectLandmark(gray, bbox)
+        landmark = bbox.reprojectLandmark(landmark)
+        landmark = [list(at) for at in landmark]
+        print landmark
+
+        if draw:
+            img = self.drawLandmark(img, bbox, landmark)
+            return bboxes, landmarks, img
+        else:
+            return bbox, landmark, img
 
     def drawLandmark(self, img, bbox, landmark):
         cv2.rectangle(img, (bbox.left, bbox.top), (bbox.right, bbox.bottom), (0,0,255), 2)
@@ -181,7 +215,9 @@ class Landmarker(object):
             patch = cv2.resize(patch, (15, 15)).reshape((1, 1, 15, 15))
             patch = self._processImage(patch)
             d1 = cnns[i].forward(patch) # size = 1x2
+            print bbox.left
             patch, patch_bbox = self._getPatch(img, bbox, (x, y), padding[1])
+            print patch.shape
             patch = cv2.resize(patch, (15, 15)).reshape((1, 1, 15, 15))
             patch = self._processImage(patch)
             d2 = cnns[i+5].forward(patch)
@@ -226,8 +262,21 @@ class FaceDetector(object):
     def __init__(self):
         self.cc = AlignDlib()
 
-    def detectFace(self, img):
+    def detectLargestFace(self, img):
+        rect = self.cc.getLargestFaceBoundingBox(img)
+        # rect[2:] += rect[:2]
+        x1 = rect.left()
+        x2 = rect.right()
+        y1 = rect.top()
+        y2 = rect.bottom()
+        return BBox([x1, x2, y1, y2])
+
+    def detectFaces(self, img):
         rects = self.cc.getAllFaceBoundingBoxes(img)
         for rect in rects:
             # rect[2:] += rect[:2]
-            yield BBox([rect.left(), rect.right(), rect.top(), rect.bottom()])
+            x1 = rect.left() if rect.left() > 0 else 0
+            x2 = rect.right() if rect.right() > 0 else 0
+            y1 = rect.top() if rect.top() > 0 else 0
+            y2 = rect.bottom() if rect.bottom() else 0
+            yield BBox([x1, x2, y1, y2])

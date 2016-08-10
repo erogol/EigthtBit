@@ -1038,7 +1038,8 @@ class TorchModel(object):
     Parent class for all torch Models
     '''
 
-    def __init__(self, gpu_mode=0, model_path=None, model_file_name=None, N=5):
+    def __init__(self, gpu_mode=0, model_path=None, model_file_name=None,
+                synset_file_name='synset.txt', N=5, feature_extraction=False):
         """
         Parameters
         ----------
@@ -1062,8 +1063,13 @@ class TorchModel(object):
             model_path = os.path.join(ROOT_PATH,"model_cpu.t7")
         else:
             model_path = os.path.join(ROOT_PATH, model_file_name)
+
         self.model = torch.load(model_path)
-        self.model._add(nn.SoftMax())
+        if feature_extraction is False:
+            self.model._add(nn.SoftMax())
+        else:
+            # assert(torch.type(self.model._get(len(model._modules)) == 'nn.Linear')
+            self.model._remove(len(self.model._modules))
 
         if gpu_mode:
             self.model._cuda()
@@ -1075,7 +1081,7 @@ class TorchModel(object):
         self.std  = np.array([ 0.229,  0.224,  0.225])
 
         # Load synset (text label)
-        self.synset = [l.split(',')[0].strip() for l in open(ROOT_PATH+'synset.txt').readlines()]
+        self.synset = [l.split(',')[0].strip() for l in open(ROOT_PATH+ synset_file_name).readlines()]
 
     def preprocess_image(self, img):
         if type(img) is str or type(img) is unicode:
@@ -1104,7 +1110,7 @@ class TorchModel(object):
         return x
 
     def classify_image(self, img, N=None):
-        # set number of results ned to be returned
+        # set number of results ned to be returned        
         if N == None:
             N = self.N
         if N > len(self.synset):
@@ -1125,8 +1131,18 @@ class TorchModel(object):
         topN_probs = prob[pred[0:N]]
         topN = zip(topN, pred[0:N])
         topN = [ topN[c] + (topN_prob,) for c,topN_prob in enumerate(topN_probs)]
-        #print "WQETQWETQWERQWERQWERQWER", prob[pred[0:5]]
         return '%.3f' % (end - start), topN
+
+    def feature_extraction(self, img, N=None):
+        img = self.preprocess_image(img)
+        # Get prediction probability of 1000 classes from model
+        if self.gpu_mode:
+            feat_vec = self.model._forward(img._cuda())
+        else:
+            feat_vec = self.model._forward(img)
+        return feat_vec.asNumpyArray()
+
+
 
 class NsfwResnetTorch(TorchModel):
     def __init__(self, gpu_mode=0):

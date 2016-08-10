@@ -24,14 +24,15 @@ def phash(img, digitize=True):
     # coefs = dct(img)
 
     # Keep only lower frequencies
-    lower_coefs = coefs[1:9, 0:8]
+    lower_coefs = coefs[0:8, 0:8]
 
     # Ignore first coeff value since it throws off the average value
     # lower_coefs_tmp = lower_coefs.copy()
     # lower_coefs_tmp[0,0] = 0
 
     # Take the mean and compute binary mask
-    mean = lower_coefs.mean()
+    # mean = lower_coefs.mean()
+    mean = (np.sum(lower_coefs) - lower_coefs[0,0]) / 63
     hash_val = lower_coefs>mean
     if digitize:
         str_rep = [ str(int(val)) for val in list(hash_val.flatten())]

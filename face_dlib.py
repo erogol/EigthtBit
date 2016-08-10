@@ -80,7 +80,7 @@ class AlignDlib:
     #: Landmark indices corresponding to the outer eyes and nose.
     OUTER_EYES_AND_NOSE = [36, 45, 33]
 
-    def __init__(self):
+    def __init__(self, pyramid_level=1):
         """
         Instantiate an 'AlignDlib' object.
 
@@ -92,6 +92,7 @@ class AlignDlib:
 
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(facePredictor)
+        self.pyramid_level = pyramid_level
 
     def getAllFaceBoundingBoxes(self, rgbImg):
         """
@@ -105,7 +106,7 @@ class AlignDlib:
         assert rgbImg is not None
 
         try:
-            return self.detector(rgbImg, 1)
+            return self.detector(rgbImg,self. pyramid_level)
         except Exception as e:
             print("Warning: {}".format(e))
             # In rare cases, exceptions are thrown.
