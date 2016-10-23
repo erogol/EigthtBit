@@ -7,10 +7,10 @@ import time
 # for torch models
 import lutorpy as lua
 import numpy as np
-require('nn')
+lua.require('nn')
 try:
-    require('cunn')
-    require('cudnn')
+    lua.require('cunn')
+    lua.require('cudnn')
 except:
     print "No CUDA support. cunn and cudnn not imported!"
 lua.eval("torch.setdefaulttensortype('torch.FloatTensor')")
@@ -1100,7 +1100,7 @@ class TorchModel(object):
         img_crop = crop_center(img_norm)
 
         # format img dimensions
-        img_crop = img_crop.transpose([2,0,1])[None,:]
+        img_crop = img_crop[None,:]
 
         assert img_crop.ndim == 4
 
@@ -1110,7 +1110,7 @@ class TorchModel(object):
         return x
 
     def classify_image(self, img, N=None):
-        # set number of results ned to be returned        
+        # set number of results ned to be returned
         if N == None:
             N = self.N
         if N > len(self.synset):
